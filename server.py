@@ -3,22 +3,34 @@ import threading
 
 clients = []
 
-def broadcast(message):
+def broadcast(message, sender):
     for client in clients:
-        try:
-            client.send(message)
-        except:
-            clients.remove(client)
+        # Skip the sender
+        if client != sender:
+            try:
+                client.send(message)
+            except:
+                if client in clients:
+                    clients.remove(client)
 
 def handle_client(client):
     while True:
         try:
             message = client.recv(1024)
-            broadcast(message)
+
+            if not message:
+                break
+
+            # Send to everyone except sender
+            broadcast(message, client)
+
         except:
-            clients.remove(client)
-            client.close()
             break
+
+    if client in clients:
+        clients.remove(client)
+
+    client.close()
 
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -33,7 +45,11 @@ def main():
 
         clients.append(client)
 
-        thread = threading.Thread(target=handle_client, args=(client,))
+        thread = threading.Thread(
+            target=handle_client,
+            args=(client,),
+            daemon=True
+        )
         thread.start()
 
 main()
